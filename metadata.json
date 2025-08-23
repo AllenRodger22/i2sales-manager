@@ -1,0 +1,5 @@
+{
+  "name": "i2Sales",
+  "description": "Software de gestão integrado com I2Sales CRM via exports e imports de planilhas",
+  "requestFramePermissions": []
+}
