@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn } from 'lucide-react';
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');

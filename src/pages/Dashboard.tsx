@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import CorretorSelector from '../components/CorretorSelector';
 import KpiCard from '../components/KpiCard';
-import FunnelChart from '../components/FunnelChart';
-import TemporalChart from '../components/TemporalChart';
 import RankingList from '../components/RankingList';
 import AIAssistant from '../components/AIAssistant';
 
