@@ -1,147 +1,81 @@
 import React, { useState } from 'react';
-import { useDashboard } from '../contexts/DashboardContext';
-import { X, Bot, Loader, AlertCircle, CheckCircle, TrendingUp, Target } from 'lucide-react';
+import { biService } from '../services/apiService';
 
 interface AIAssistantProps {
+  data: any;
+  mode: string;
   onClose: () => void;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ onClose }) => {
-  const { generateAIInsights, isLoading } = useDashboard();
+const AIAssistant: React.FC<AIAssistantProps> = ({ data, mode, onClose }) => {
   const [insights, setInsights] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
-  const handleGenerateInsights = async () => {
+  const generateInsights = async () => {
     try {
+      setLoading(true);
       setError('');
-      const result = await generateAIInsights();
-      setInsights(result);
+      const result = await biService.getAIInsights(data, mode);
+      setInsights(result.insights);
     } catch (err) {
       setError('Erro ao gerar insights. Verifique se a API do Gemini está configurada.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const formatInsights = (text: string) => {
-    const sections = text.split('##').filter(section => section.trim());
-    
-    return sections.map((section, index) => {
-      const lines = section.trim().split('\n');
-      const title = lines[0].trim();
-      const content = lines.slice(1).join('\n').trim();
-      
-      let icon = <Bot className="h-5 w-5" />;
-      let bgColor = 'bg-blue-50';
-      let textColor = 'text-blue-800';
-      
-      if (title.toLowerCase().includes('positivo') || title.toLowerCase().includes('destaque')) {
-        icon = <CheckCircle className="h-5 w-5" />;
-        bgColor = 'bg-green-50';
-        textColor = 'text-green-800';
-      } else if (title.toLowerCase().includes('atenção') || title.toLowerCase().includes('problema')) {
-        icon = <AlertCircle className="h-5 w-5" />;
-        bgColor = 'bg-yellow-50';
-        textColor = 'text-yellow-800';
-      } else if (title.toLowerCase().includes('ações') || title.toLowerCase().includes('sugeridas')) {
-        icon = <Target className="h-5 w-5" />;
-        bgColor = 'bg-purple-50';
-        textColor = 'text-purple-800';
-      } else if (title.toLowerCase().includes('resumo')) {
-        icon = <TrendingUp className="h-5 w-5" />;
-        bgColor = 'bg-gray-50';
-        textColor = 'text-gray-800';
-      }
-      
-      return (
-        <div key={index} className={`${bgColor} rounded-lg p-4 mb-4`}>
-          <div className={`flex items-center mb-2 ${textColor}`}>
-            {icon}
-            <h3 className="ml-2 text-lg font-semibold">{title}</h3>
-          </div>
-          <div className={`${textColor} whitespace-pre-wrap`}>
-            {content}
-          </div>
-        </div>
-      );
-    });
-  };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <Bot className="h-6 w-6 text-purple-600 mr-2" />
-            <h3 className="text-lg font-medium text-gray-900">
-              Ajudante do Gestor - Insights de IA
-            </h3>
-          </div>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-6 w-11/12 md:w-3/4 lg:w-1/2 shadow-2xl rounded-2xl bg-white/10 backdrop-blur-md border border-white/20">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold text-white flex items-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg flex items-center justify-center mr-3">
+              🤖
+            </div>
+            Ajudante do Gestor
+          </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg p-2 transition-all duration-200"
           >
-            <X className="h-6 w-6" />
+            ✕
           </button>
         </div>
 
-        <div className="mb-4">
-          <p className="text-sm text-gray-600 mb-4">
-            Clique no botão abaixo para gerar insights inteligentes baseados nos dados carregados.
-            A IA analisará sua performance e fornecerá recomendações acionáveis.
-          </p>
-          
-          {!insights && !error && (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-orange-500 border-t-transparent"></div>
+            <span className="ml-3 text-white font-medium">Analisando dados...</span>
+          </div>
+        ) : error ? (
+          <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-xl p-6">
+            <p className="text-red-200 mb-4">{error}</p>
             <button
-              onClick={handleGenerateInsights}
-              disabled={isLoading}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
+              onClick={generateInsights}
+              className="bg-red-500/90 hover:bg-red-600 backdrop-blur-sm text-white px-6 py-2 rounded-lg font-medium transition-all duration-200 shadow-lg border border-red-400/30"
             >
-              {isLoading ? (
-                <>
-                  <Loader className="animate-spin h-4 w-4 mr-2" />
-                  Gerando insights...
-                </>
-              ) : (
-                <>
-                  <Bot className="h-4 w-4 mr-2" />
-                  Gerar Insights
-                </>
-              )}
+              Tentar Novamente
             </button>
-          )}
-        </div>
-
-        {error && (
-          <div className="mb-4 rounded-md bg-red-50 p-4">
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-red-400" />
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">
-                  Erro ao gerar insights
-                </h3>
-                <div className="mt-2 text-sm text-red-700">
-                  {error}
-                </div>
-              </div>
+          </div>
+        ) : insights ? (
+          <div className="max-h-96 overflow-y-auto bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+            <div className="prose prose-sm max-w-none text-white prose-headings:text-white prose-strong:text-white prose-p:text-white/90 prose-li:text-white/90">
+              <div className="whitespace-pre-wrap">{insights}</div>
             </div>
           </div>
-        )}
-
-        {insights && (
-          <div className="max-h-96 overflow-y-auto">
-            <div className="prose prose-sm max-w-none">
-              {formatInsights(insights)}
+        ) : (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-white text-2xl">🧠</span>
             </div>
-            
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <button
-                onClick={handleGenerateInsights}
-                disabled={isLoading}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                <Bot className="h-4 w-4 mr-2" />
-                Gerar Novos Insights
-              </button>
-            </div>
+            <button
+              onClick={generateInsights}
+              className="bg-orange-500/90 hover:bg-orange-600 backdrop-blur-sm text-white px-8 py-3 rounded-xl font-medium transition-all duration-200 shadow-lg border border-orange-400/30"
+            >
+              Gerar Insights com IA
+            </button>
           </div>
         )}
       </div>

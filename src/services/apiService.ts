@@ -47,9 +47,21 @@ export const biService = {
   },
 };
 
+export const corretorService = {
+  getCorretorAnalysis: async (corretorId: string) => {
+    const response = await api.get(`/api/bi/corretor/${corretorId}`);
+    return response.data;
+  },
+  
+  getTeamAnalysis: async () => {
+    const response = await api.get('/api/bi/team-analysis');
+    return response.data;
+  },
+};
+
 export const userService = {
   getCorretores: async () => {
-    const response = await api.get('/api/users/corretores');
+    const response = await api.get('/api/bi/corretores');
     return response.data;
   },
 };

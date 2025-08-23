@@ -37,6 +37,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(true);
       const response = await authService.login(email, password);
       
+      if (response.role !== 'manager' && response.role !== 'admin') {
+        throw new Error('Acesso negado. Este sistema é apenas para gestores. Por favor, saia do sistema.');
+      }
+      
       const userData: User = {
         id: response.id || '1',
         email: email,
