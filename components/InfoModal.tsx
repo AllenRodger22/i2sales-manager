@@ -1,133 +1,63 @@
 import React from 'react';
-import { CloseIcon, InfoIcon, UserIcon, UsersIcon } from './icons';
+import { CloseIcon, InfoIcon } from './icons';
 
 interface InfoModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const analysisModes = [
+const metricDefinitions = [
   {
-    title: 'Análise Individual',
-    subtitle: 'Normal',
-    Icon: UserIcon,
-    purpose: 'Avaliar a performance de <strong>um corretor</strong> em um período específico.',
-    filesNeeded: [
-      '<strong>1 arquivo</strong> de produtividade',
-      '<strong>1 arquivo</strong> de clientes'
-    ],
-    examples: [
-      'produtividade_Joao_01012025-31012025.csv',
-      'clientes_Joao_base_completa.csv',
-    ]
+    title: 'Total de VGV (Valor Geral de Vendas)',
+    description: 'Soma total dos valores de todas as vendas geradas no período. É uma métrica cumulativa que aumenta com novas vendas e diminui se uma venda for revertida.'
   },
   {
-    title: 'Análise Individual',
-    subtitle: 'Comparativa',
-    Icon: UserIcon,
-    purpose: 'Comparar a evolução de <strong>um corretor</strong> entre dois ou mais períodos.',
-    filesNeeded: [
-      '<strong>2+ arquivos</strong> de produtividade (períodos diferentes)',
-      '<strong>1 arquivo</strong> de clientes'
-    ],
-    examples: [
-      'produtividade_Joao_01012025-31012025.csv',
-      'produtividade_Joao_01022025-28022025.csv',
-      'clientes_Joao_base_completa.csv',
-    ]
+    title: 'Vendas',
+    description: 'Esta é uma métrica cumulativa. <strong>Soma +1</strong> no dia em que um status muda para "Venda Gerada" e <strong>subtrai -1</strong> se um cliente que era "Venda Gerada" tiver seu status alterado para qualquer outro.'
   },
   {
-    title: 'Análise de Equipe',
-    subtitle: 'Normal',
-    Icon: UsersIcon,
-    purpose: 'Avaliar a performance de <strong>toda a equipe</strong> em um mesmo período.',
-    filesNeeded: [
-      'Para <strong>cada corretor</strong>:',
-      '↳ <strong>1 arquivo</strong> de produtividade',
-      '↳ <strong>1 arquivo</strong> de clientes',
-    ],
-    examples: [
-      'produtividade_Joao_01012025-31012025.csv',
-      'clientes_Joao_base_completa.csv',
-      'produtividade_Maria_01012025-31012025.csv',
-      'clientes_Maria_base_completa.csv',
-    ]
+    title: 'Ligações',
+    description: 'Conta +1 no dia em que a <strong>primeira ligação</strong> (seja CE ou CNE) é registrada para um cliente. Ligações futuras para o mesmo cliente não são contadas novamente nesta métrica.'
   },
   {
-    title: 'Análise de Equipe',
-    subtitle: 'Comparativa',
-    Icon: UsersIcon,
-    purpose: 'Comparar a evolução da <strong>equipe inteira</strong> entre dois ou mais períodos.',
-    filesNeeded: [
-      'Para <strong>cada corretor</strong>:',
-      '↳ <strong>2+ arquivos</strong> de produtividade (períodos diferentes)',
-      '↳ <strong>1 arquivo</strong> de clientes',
-    ],
-    examples: [
-      'produtividade_Joao_01012025-31012025.csv',
-      'produtividade_Joao_01022025-28022025.csv',
-      'clientes_Joao_base_completa.csv',
-      '<em>(...e o mesmo para os outros corretores)</em>'
-    ]
+    title: 'Documentação',
+    description: 'Conta +1 no dia em que o status de um cliente é alterado pela <strong>primeira vez</strong> para "Doc Completa".'
   }
 ];
+
 
 const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onClick={onClose}>
-            <div className="bg-card dark:bg-dark-card w-full max-w-4xl max-h-[90vh] rounded-lg shadow-lg flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-card dark:bg-dark-card w-full max-w-3xl max-h-[90vh] rounded-lg shadow-lg flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                 <header className="flex items-center justify-between p-4 border-b border-border dark:border-dark-border flex-shrink-0">
                     <div className="flex items-center gap-2">
                         <InfoIcon className="h-6 w-6 text-primary" />
-                        <h2 className="text-lg font-semibold text-foreground dark:text-dark-foreground">Modos de Análise e Arquivos</h2>
+                        <h2 className="text-lg font-semibold text-foreground dark:text-dark-foreground">Entendendo as Métricas</h2>
                     </div>
                     <button onClick={onClose} className="p-1 rounded-full text-muted-foreground hover:bg-muted dark:hover:bg-dark-muted" aria-label="Fechar">
                         <CloseIcon className="h-5 w-5" />
                     </button>
                 </header>
                 <main className="p-6 overflow-y-auto text-sm text-foreground/90 dark:text-dark-foreground/90">
-                    <div className="p-4 bg-muted/50 dark:bg-dark-muted/50 rounded-lg border border-border dark:border-dark-border mb-6">
-                        <h3 className="font-semibold text-foreground dark:text-dark-foreground mb-2">Estrutura de Nomenclatura dos Arquivos</h3>
-                        <p className="mb-3">Para que a análise funcione, os arquivos CSV devem seguir um padrão de nomenclatura. O sistema extrai o <strong>nome do agente</strong> e o <strong>período</strong> diretamente do nome do arquivo.</p>
-                        <div className="space-y-2 text-sm">
-                            <div>
-                                <p><strong>Produtividade:</strong> <code className="text-xs bg-card dark:bg-dark-card p-1 rounded-md">produtividade_&lt;NomeAgente&gt;_&lt;DataInicio&gt;-&lt;DataFim&gt;.csv</code></p>
-                            </div>
-                            <div>
-                                <p><strong>Clientes:</strong> <code className="text-xs bg-card dark:bg-dark-card p-1 rounded-md">clientes_&lt;NomeAgente&gt;_&lt;QualquerDescricao&gt;.csv</code></p>
-                            </div>
-                        </div>
-                    </div>
+                    <p className="mb-6">
+                        A análise é feita com base no histórico de eventos de cada cliente, extraído dos arquivos CSV. Abaixo está o detalhamento de como cada métrica chave é calculada:
+                    </p>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {analysisModes.map(({ title, subtitle, Icon, purpose, filesNeeded, examples }) => (
-                        <div key={title+subtitle} className="bg-muted/50 dark:bg-dark-muted/50 p-4 rounded-lg border border-border dark:border-dark-border flex flex-col">
-                          <div className="flex items-center gap-3 mb-3">
-                            <Icon className="h-8 w-8 text-primary/80 flex-shrink-0" />
-                            <div>
-                              <h3 className="font-semibold text-lg text-foreground dark:text-dark-foreground">{title}</h3>
-                              <p className="text-sm text-primary dark:text-dark-primary font-medium">{subtitle}</p>
-                            </div>
-                          </div>
-                          <div className="space-y-3 text-foreground/80 dark:text-dark-foreground/80">
-                             <p dangerouslySetInnerHTML={{ __html: purpose }} />
-                             <div>
-                                <h4 className="font-semibold text-foreground dark:text-dark-foreground mb-1">Arquivos necessários:</h4>
-                                <ul className="space-y-1">
-                                  {filesNeeded.map((file, i) => <li key={i} className="text-xs" dangerouslySetInnerHTML={{ __html: `• ${file}`}}/>)}
-                                </ul>
-                             </div>
-                             <div>
-                                <h4 className="font-semibold text-foreground dark:text-dark-foreground mb-1">Exemplo:</h4>
-                                <div className="p-2 bg-card dark:bg-dark-card rounded text-xs space-y-1 font-mono">
-                                  {examples.map((ex, i) => <p key={i} dangerouslySetInnerHTML={{ __html: ex }}/>)}
-                                </div>
-                             </div>
-                          </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {metricDefinitions.map(({ title, description }) => (
+                        <div key={title} className="bg-muted/50 dark:bg-dark-muted/50 p-4 rounded-lg border border-border dark:border-dark-border">
+                          <h3 className="font-semibold text-base text-foreground dark:text-dark-foreground mb-2">{title}</h3>
+                          <p className="text-foreground/80 dark:text-dark-foreground/80" dangerouslySetInnerHTML={{ __html: description }} />
                         </div>
                       ))}
+                    </div>
+
+                    <div className="mt-6 p-4 bg-muted/50 dark:bg-dark-muted/50 rounded-lg border border-border dark:border-dark-border">
+                        <h3 className="font-semibold text-foreground dark:text-dark-foreground mb-2">Funil de Vendas e Outras Métricas</h3>
+                        <p>O funil de vendas e outras métricas de apoio (como Contatos Efetivos e Tratativas) continuam sendo calculados para análises temporais e de conversão, mesmo que não apareçam como KPIs principais.</p>
                     </div>
                 </main>
             </div>

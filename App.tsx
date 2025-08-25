@@ -1,24 +1,25 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { AgentData, AnalysisMode } from './types';
-import { processFiles } from './services/csvProcessor';
-import { useDataAnalysis } from './hooks/useDataAnalysis';
-import FileUpload from './components/FileUpload';
+import React, { useState, useMemo, useEffect } from 'react';
+import { ApiClient, ClientEvent } from './types';
 import Dashboard from './components/Dashboard';
-import { LogoIcon, UserIcon, UsersIcon, SunIcon, MoonIcon, SparklesIcon, InfoIcon } from './components/icons';
+import { LogoIcon, UserIcon, SunIcon, MoonIcon, InfoIcon } from './components/icons';
 import InitialScreen from './components/InitialScreen';
-import FileManager from './components/FileManager';
-import AIAssistant from './components/AIAssistant';
 import InfoModal from './components/InfoModal';
+import { useDataAnalysis } from './hooks/useDataAnalysis';
+import { processFiles } from './services/csvProcessor';
 
 const App: React.FC = () => {
-  const [fileList, setFileList] = useState<File[]>([]);
-  const [agentData, setAgentData] = useState<AgentData[]>([]);
-  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(AnalysisMode.Team);
+  const [allClients, setAllClients] = useState<ApiClient[]>([]);
+  const [availableAgents, setAvailableAgents] = useState<string[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  
+  const today = new Date().toISOString().split('T')[0];
+  const thirtyDaysAgo = new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: thirtyDaysAgo, end: today });
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
   useEffect(() => {
@@ -28,80 +29,107 @@ const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
-  
-  useEffect(() => {
-    const processFileList = async () => {
-      if (fileList.length === 0) {
-        setAgentData([]);
-        setError(null);
-        return;
-      }
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const data = await processFiles(fileList as any);
-        setAgentData(data);
-        
-        if (data.length === 1) {
-            if(analysisMode !== AnalysisMode.Individual) setAnalysisMode(AnalysisMode.Individual);
-            if(selectedAgent !== data[0].name) setSelectedAgent(data[0].name);
-        } else if (data.length > 1) {
-            if(analysisMode !== AnalysisMode.Team) setAnalysisMode(AnalysisMode.Team);
-            if(selectedAgent !== null && !data.some(d => d.name === selectedAgent)) {
-                setSelectedAgent(null);
-            }
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Ocorreu um erro desconhecido durante o processamento do arquivo.');
-        setAgentData([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
 
-    processFileList();
-  }, [fileList]);
+  const handleFilesSelected = async (files: FileList) => {
+    if (files.length === 0) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+        const clients = await processFiles(files);
+        setAllClients(clients);
+
+        if (clients.length > 0) {
+          const agentNames = [...new Set(clients.map(client => client.corretor).filter(Boolean))];
+          const sortedAgents = agentNames.sort();
+          
+          setAvailableAgents(sortedAgents);
+          
+          if (sortedAgents.length > 0) {
+            setSelectedAgent(sortedAgents[0]);
+          }
+        } else {
+           setAvailableAgents([]);
+           setError('Nenhum dado de cliente válido foi encontrado. Verifique o conteúdo dos seus arquivos CSV.');
+        }
+
+    } catch (e) {
+        setError(e instanceof Error ? e.message : 'Ocorreu um erro desconhecido ao processar os arquivos.');
+        setAvailableAgents([]);
+        setAllClients([]);
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+
+  const clientEvents = useMemo<ClientEvent[]>(() => {
+    if (!selectedAgent || allClients.length === 0) {
+      return [];
+    }
+    const agentClients = allClients.filter(c => c.corretor === selectedAgent);
+    const events: ClientEvent[] = [];
+
+    agentClients.forEach(client => {
+      if (client.historico) {
+          client.historico.forEach(item => {
+          let event: ClientEvent | null = null;
+          switch (item.tipo) {
+            case 'STATUS_CHANGE':
+              if (item.para) {
+                event = {
+                  clientId: client.nome,
+                  timestamp: item.timestamp,
+                  type: 'STATUS_CHANGE',
+                  details: { from: item.de, to: item.para },
+                };
+                 if (item.para === 'Venda Gerada' && client.valorVenda) {
+                    event.details.saleValue = client.valorVenda;
+                }
+              }
+              break;
+            case 'CALL':
+              if (item.resultado) {
+                event = {
+                  clientId: client.nome,
+                  timestamp: item.timestamp,
+                  type: 'CALL',
+                  details: { result: item.resultado },
+                };
+              }
+              break;
+            case 'NOTE':
+              event = {
+                clientId: client.nome,
+                timestamp: item.timestamp,
+                type: 'NOTE',
+                details: {
+                  noteType: item.texto?.toLowerCase().includes('cne') ? 'CNE' : 'Observação',
+                },
+              };
+              break;
+          }
+          if (event) events.push(event);
+        });
+      }
+    });
+    return events;
+  }, [selectedAgent, allClients]);
+
+  const analysisData = useDataAnalysis(clientEvents, dateRange);
 
   const toggleTheme = () => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
   };
+  
+  const hasData = useMemo(() => !!analysisData?.individualMetrics && analysisData.individualMetrics.kpis.length > 0, [analysisData]);
 
-  const analysisResults = useDataAnalysis(agentData);
-
-  const handleAddFiles = useCallback((files: FileList) => {
-    const newFiles = Array.from(files);
-    setFileList(prevList => {
-      const existingNames = new Set(prevList.map(f => f.name));
-      const uniqueNewFiles = newFiles.filter(f => !existingNames.has(f.name));
-      return [...prevList, ...uniqueNewFiles];
-    });
-  }, []);
-
-  const handleRemoveFile = useCallback((fileNameToRemove: string) => {
-    setFileList(prevList => prevList.filter(file => file.name !== fileNameToRemove));
-  }, []);
-
-
-
-  const agentNames = useMemo(() => analysisResults.agentNames, [analysisResults]);
-
-  const handleModeChange = (mode: AnalysisMode) => {
-    setAnalysisMode(mode);
-    if (mode === AnalysisMode.Individual && agentNames.length > 0 && !agentNames.includes(selectedAgent || '')) {
-      setSelectedAgent(agentNames[0]);
-    } else if (mode === AnalysisMode.Team) {
-        setSelectedAgent(null);
-    }
-  };
-
-  if (fileList.length === 0) {
+  if (allClients.length === 0) {
     return (
         <>
             <InitialScreen 
-                onFilesSelected={handleAddFiles} 
-                isLoading={isLoading} 
-                error={error} 
+                onFilesSelected={handleFilesSelected}
+                isLoading={isLoading}
+                error={error}
                 onShowInfo={() => setIsInfoModalOpen(true)}
                 theme={theme}
                 toggleTheme={toggleTheme}
@@ -127,93 +155,67 @@ const App: React.FC = () => {
             </button>
         </div>
         
-        <div className="space-y-6 mb-6">
-            <FileUpload onFilesSelected={handleAddFiles} isLoading={isLoading} />
-            <FileManager files={fileList} onRemoveFile={handleRemoveFile} />
-        </div>
-        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+        {error && <p className="text-red-500 text-sm my-4 p-3 bg-red-500/10 rounded-md">{error}</p>}
         
-        {agentData.length > 0 && !isLoading && (
-          <div className="mt-auto flex flex-col">
+        <div className="flex flex-col">
             <nav className="space-y-6">
               <div>
                 <h2 className="text-xs font-semibold text-muted-foreground dark:text-dark-muted-foreground uppercase tracking-wider mb-2">Modo de Análise</h2>
                 <div className="flex rounded-md">
-                  <button
-                    onClick={() => handleModeChange(AnalysisMode.Individual)}
-                    disabled={agentNames.length === 0}
-                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-l-md transition-all duration-200 flex items-center justify-center gap-2 border ${
-                      analysisMode === AnalysisMode.Individual 
-                        ? 'bg-primary text-primary-foreground border-primary' 
-                        : 'bg-transparent text-foreground dark:text-dark-foreground border-border dark:border-dark-border hover:bg-muted dark:hover:bg-dark-muted'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                   <button
+                    disabled
+                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center justify-center gap-2 border bg-primary text-primary-foreground border-primary disabled:opacity-75`}
                   >
                     <UserIcon className="h-4 w-4" />
                     Individual
                   </button>
-                  <button
-                    onClick={() => handleModeChange(AnalysisMode.Team)}
-                    disabled={agentNames.length < 2}
-                    className={`flex-1 px-4 py-2 text-sm font-medium rounded-r-md transition-all duration-200 flex items-center justify-center gap-2 border border-l-0 ${
-                      analysisMode === AnalysisMode.Team 
-                        ? 'bg-primary text-primary-foreground border-primary' 
-                        : 'bg-transparent text-foreground dark:text-dark-foreground border-border dark:border-dark-border hover:bg-muted dark:hover:bg-dark-muted'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    <UsersIcon className="h-4 w-4" />
-                    Equipe
-                  </button>
                 </div>
               </div>
 
-              {analysisMode === AnalysisMode.Individual && (
-                <div>
-                  <label htmlFor="agent-select" className="text-xs font-semibold text-muted-foreground dark:text-dark-muted-foreground uppercase tracking-wider mb-2 block">Selecione o Agente</label>
-                  <select
-                    id="agent-select"
-                    value={selectedAgent ?? ''}
-                    onChange={(e) => setSelectedAgent(e.target.value)}
-                    className="w-full p-2 border border-border dark:border-dark-border rounded-md shadow-sm focus:ring-primary focus:border-primary bg-card dark:bg-dark-card text-foreground dark:text-dark-foreground"
-                  >
-                    {agentNames.map(name => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </nav>
+              <div>
+                <label htmlFor="agent-select" className="text-xs font-semibold text-muted-foreground dark:text-dark-muted-foreground uppercase tracking-wider mb-2 block">Selecione o Corretor</label>
+                <select
+                  id="agent-select"
+                  value={selectedAgent ?? ''}
+                  onChange={(e) => setSelectedAgent(e.target.value)}
+                  className="w-full p-2 border border-border dark:border-dark-border rounded-md shadow-sm focus:ring-primary focus:border-primary bg-card dark:bg-dark-card text-foreground dark:text-dark-foreground"
+                >
+                  {availableAgents.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
 
-             <div className="mt-6 pt-6 border-t border-border dark:border-dark-border">
-                 <h2 className="text-xs font-semibold text-muted-foreground dark:text-dark-muted-foreground uppercase tracking-wider mb-2">Ferramentas IA</h2>
-                 <button
-                    onClick={() => setIsAssistantOpen(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20"
-                 >
-                    <SparklesIcon className="h-5 w-5" />
-                    Ajudante do Gestor
-                 </button>
-            </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground dark:text-dark-muted-foreground uppercase tracking-wider mb-2 block">Período de Análise</label>
+                <div className="flex flex-col space-y-2">
+                  <input
+                    type="date"
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                    className="w-full p-2 border border-border dark:border-dark-border rounded-md shadow-sm focus:ring-primary focus:border-primary bg-card dark:bg-dark-card text-foreground dark:text-dark-foreground"
+                  />
+                  <input
+                    type="date"
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                    className="w-full p-2 border border-border dark:border-dark-border rounded-md shadow-sm focus:ring-primary focus:border-primary bg-card dark:bg-dark-card text-foreground dark:text-dark-foreground"
+                  />
+                </div>
+              </div>
+            </nav>
           </div>
-        )}
       </aside>
       
       <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
         <Dashboard
-          analysisMode={analysisMode}
-          analysisResults={analysisResults}
+          analysisResults={analysisData}
           selectedAgent={selectedAgent}
-          isLoading={isLoading}
-          hasData={agentData.length > 0}
+          isLoading={false}
+          hasData={hasData}
         />
       </main>
-
-      <AIAssistant 
-        isOpen={isAssistantOpen}
-        onClose={() => setIsAssistantOpen(false)}
-        analysisResults={analysisResults}
-        analysisMode={analysisMode}
-        selectedAgent={selectedAgent}
-      />
+      
       <InfoModal isOpen={isInfoModalOpen} onClose={() => setIsInfoModalOpen(false)} />
     </div>
   );

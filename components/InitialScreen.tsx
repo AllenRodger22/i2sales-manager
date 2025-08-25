@@ -1,6 +1,6 @@
 import React from 'react';
+import { LogoIcon, SunIcon, MoonIcon, InfoIcon, AlertTriangleIcon } from './icons';
 import FileUpload from './FileUpload';
-import { LogoIcon, SunIcon, MoonIcon, InfoIcon } from './icons';
 
 interface InitialScreenProps {
   onFilesSelected: (files: FileList) => void;
@@ -31,12 +31,18 @@ const InitialScreen: React.FC<InitialScreenProps> = ({ onFilesSelected, isLoadin
         <div className="bg-black/10 dark:bg-black/20 backdrop-blur-sm p-8 rounded-lg">
             <h1 className="text-5xl font-bold mb-2">Bem-vindo ao i2Sales</h1>
             <p className="text-lg text-muted-foreground dark:text-dark-muted-foreground mb-8">
-            Sua plataforma de Business Intelligence para análise de vendas.
+              Sua plataforma de Business Intelligence para análise de vendas.
             </p>
-            <div className="max-w-xl mx-auto">
-                <FileUpload onFilesSelected={onFilesSelected} isLoading={isLoading} />
-                {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
-            </div>
+            <FileUpload onFilesSelected={onFilesSelected} isLoading={isLoading} />
+            {error && (
+                <div className="mt-4 max-w-xl mx-auto p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg flex items-center justify-center gap-3">
+                    <AlertTriangleIcon className="h-6 w-6"/>
+                    <p className="text-sm font-medium">{error}</p>
+                </div>
+            )}
+             <p className="text-xs text-muted-foreground dark:text-dark-muted-foreground mt-4">
+                Para começar, carregue um ou mais arquivos de exportação (.csv). O nome de cada arquivo será usado como o nome do corretor (ex: <strong>JoaoSilva.csv</strong>).
+            </p>
         </div>
       </div>
     </div>
